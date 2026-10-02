@@ -105,9 +105,7 @@ fn make_interface(trexio_h: &PathBuf) -> io::Result<()> {
 
     // For <=2.6.1
     let trexio_auto = "TREXIO_AUTO".to_string();
-    if !be.contains_key(&trexio_auto) {
-        be.insert(trexio_auto, 2).unwrap();
-    }
+    be.entry(trexio_auto).or_insert(2);
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let wrapper_h = out_path.join(WRAPPER_H);
