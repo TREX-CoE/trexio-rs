@@ -51,7 +51,7 @@ jobs:
 
           mkdir build && cd build
           cmake .. \
-            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_INSTALL_PREFIX=/usr/ \
             -DTREXIO_USE_HDF5=ON \
             -DTREXIO_FORTRAN=OFF \
             -DTREXIO_PYTHON=OFF \
