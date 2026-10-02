@@ -117,9 +117,6 @@ fn make_interface(trexio_h: &PathBuf) -> io::Result<()> {
         write!(&mut wrapper_file, "const back_end_t {} = {};\n", k, v)?;
     }
 
-    write!(&mut wrapper_file, "#undef TREXIO_AUTO\n")?;
-    write!(&mut wrapper_file, "const back_end_t TREXIO_AUTO = TREXIO_INVALID_BACK_END;\n")?;
-
     Ok(())
 }
 
