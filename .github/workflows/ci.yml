@@ -38,12 +38,13 @@ jobs:
           PATCH=$(echo "$CRS_VER" | cut -d. -f3)
           # Rust version 2.6.1xx targets C library 2.6.x (first digit of patch)
           C_PATCH=$((PATCH / 100))
-          echo "TREXIO_TAG=v${MAJOR}.${MINOR}.${C_PATCH}" >> "$GITHUB_OUTPUT"
+          echo "TREXIO_TAG=${MAJOR}.${MINOR}.${C_PATCH}" >> "$GITHUB_OUTPUT"
 
       - name: Download, build and install the trexio C library
         run: |
+          echo "VERSION=${{ steps.version.outputs.TREXIO_TAG }}"
           curl -L -o trexio.tar.gz \
-            "https://github.com/trex-coe/trexio/archive/refs/tags/${{ steps.version.outputs.TREXIO_TAG }}.tar.gz"
+            "https://github.com/TREX-CoE/trexio/releases/download/v${{ steps.version.outputs.TREXIO_TAG }}/trexio-${{ steps.version.outputs.TREXIO_TAG }}.tar.gz"
 
           tar xzf trexio.tar.gz
           cd trexio-${{ steps.version.outputs.TREXIO_TAG }}
