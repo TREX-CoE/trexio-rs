@@ -1,14 +1,13 @@
 const WRAPPER_H: &str = "wrapper.h";
 const GENERATED_RS: &str = "generated.rs";
 
-use std::env;
-use std::path::PathBuf;
+use pkg_config::Config;
+use serde_json::Value;
 use std::collections::HashMap;
+use std::env;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
-use serde_json::Value;
-use pkg_config::Config;
-
+use std::path::PathBuf;
 
 /// The header path will be searched in the following order:
 ///
@@ -77,7 +76,6 @@ fn find_header_path() -> Option<PathBuf> {
     None
 }
 
-
 /// This function reads from `trexio.h`, extracts the exit codes and backends, and writes them to `wrapper.h`.
 fn make_interface(trexio_h: &PathBuf) -> io::Result<()> {
     let mut err = HashMap::new();
@@ -105,6 +103,12 @@ fn make_interface(trexio_h: &PathBuf) -> io::Result<()> {
         }
     }
 
+    // For <=2.6.1
+    let trexio_auto = "TREXIO_AUTO".to_string();
+    if !be.contains_key(&trexio_auto) {
+        be.insert(trexio_auto, 2).unwrap();
+    }
+
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let wrapper_h = out_path.join(WRAPPER_H);
     let mut wrapper_file = File::create(wrapper_h)?;
@@ -123,7 +127,6 @@ fn make_interface(trexio_h: &PathBuf) -> io::Result<()> {
     Ok(())
 }
 
-
 /// Type conversions for Rust API
 fn convert_r(typ: &str) -> String {
     match typ {
@@ -132,8 +135,9 @@ fn convert_r(typ: &str) -> String {
         "float" | "float sparse" | "float buffered" => "f64",
         "dim" | "dim readonly" | "index" => "usize",
         "str" => "str",
-        _ => panic!("Unknown type to convert: {}", typ)
-    }.to_string()
+        _ => panic!("Unknown type to convert: {}", typ),
+    }
+    .to_string()
 }
 
 /// Type conversion to call C functions
@@ -142,10 +146,10 @@ fn convert_c(typ: &str) -> String {
         "int" | "int special" | "dim" | "dim readonly" | "index" => "i64",
         "float" | "float sparse" | "float buffered" => "f64",
         "str" => "str",
-        _ => panic!("Unknown type to convert: {}", typ)
-    }.to_string()
+        _ => panic!("Unknown type to convert: {}", typ),
+    }
+    .to_string()
 }
-
 
 /// Generate has-functions for checking the existence of groups and elements in a TREXIO file.
 ///
@@ -178,7 +182,8 @@ pub fn has_{group_l}(&self) -> Result<bool, ExitCode> {{
         c::TREXIO_HAS_NOT   =>  Ok(false),
         x                   =>  Err(ExitCode::from(x)),
     }}
-}}");
+}}"
+            );
 
             r.push(has_group_func);
 
@@ -214,9 +219,6 @@ pub fn has_{group_l}_{element_l}(&self) -> Result<bool, ExitCode> {{
     r
 }
 
-
-
-
 fn make_scalar_functions(data: &serde_json::Value) -> Vec<String> {
     let mut r: Vec<String> = Vec::new();
 
@@ -232,7 +234,8 @@ fn make_scalar_functions(data: &serde_json::Value) -> Vec<String> {
             if attributes[1].as_array().unwrap().is_empty() {
                 match typ {
                     "int" | "float" | "dim" | "index" => {
-                        let s = format!(r#"
+                        let s = format!(
+                            r#"
 /// Reads the scalar element `{element}` from the group `{group}` in the file.
 ///
 /// # Parameters
@@ -266,11 +269,13 @@ pub fn write_{group_l}_{element_l}(&self, data: {type_r}) -> Result<(), ExitCode
     let rc = unsafe {{ c::trexio_write_{group}_{element}_64(self.ptr, data) }};
     rc_return((), rc)
 }}
-"#);
+"#
+                        );
                         r.push(s);
-                    },
+                    }
                     "str" => {
-                        let s = format!(r#"
+                        let s = format!(
+                            r#"
 /// Reads the string attribute `{element}` contained in the group `{group}`.
 /// # Parameters
 ///
@@ -309,11 +314,13 @@ pub fn write_{group_l}_{element_l}(&self, data: &str) -> Result<(), ExitCode> {{
     let rc = unsafe {{ c::trexio_write_{group}_{element}(self.ptr, data, size) }};
     rc_return((), rc)
 }}
-"#);
+"#
+                        );
                         r.push(s);
-                    },
+                    }
                     "dim readonly" => {
-                        let s = format!(r#"
+                        let s = format!(
+                            r#"
 /// Reads the dimensioning variable `{element}` from the group `{group}`.
 ///
 /// # Parameters
@@ -332,9 +339,10 @@ pub fn read_{group_l}_{element_l}(&self) -> Result<{type_r}, ExitCode> {{
    }};
    rc_return(data, rc)
 }}
-"#);
+"#
+                        );
                         r.push(s);
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -342,8 +350,6 @@ pub fn read_{group_l}_{element_l}(&self) -> Result<{type_r}, ExitCode> {{
     }
     r
 }
-
-
 
 fn make_array_functions(data: &serde_json::Value) -> Vec<String> {
     let mut r: Vec<String> = Vec::new();
@@ -358,8 +364,8 @@ fn make_array_functions(data: &serde_json::Value) -> Vec<String> {
             let element_l = element.to_lowercase();
             let dimensions = attributes[1].as_array().unwrap();
             let dimensions: Vec<&str> = dimensions.iter().map(|x| x.as_str().unwrap()).collect();
-            let dimensions_str = format!("{:?}", dimensions).replace("\"","");
-            if ! dimensions.is_empty() {
+            let dimensions_str = format!("{:?}", dimensions).replace("\"", "");
+            if !dimensions.is_empty() {
                 match typ {
                     "int" | "float" | "dim" | "index" => {
                         r.push(format!(r#"
@@ -386,7 +392,10 @@ fn make_array_functions(data: &serde_json::Value) -> Vec<String> {
                             if let Some(dim) = dimensions.first() {
                                 if dim.contains('.') {
                                     let parts: Vec<&str> = dim.split('.').collect();
-                                    r.push(format!("/// let {}_{} = trexio_file.read_{}_{}()?;", parts[0], parts[1], parts[0], parts[1]));
+                                    r.push(format!(
+                                        "/// let {}_{} = trexio_file.read_{}_{}()?;",
+                                        parts[0], parts[1], parts[0], parts[1]
+                                    ));
                                     r.push(format!("/// let two_d_array: Vec<_> = one_d_array.chunks({}_{}).collect();", parts[0], parts[1]));
                                 } else {
                                     r.push(format!("/// let two_d_array: Vec<_> = one_d_array.chunks({}).collect();", dim));
@@ -395,15 +404,21 @@ fn make_array_functions(data: &serde_json::Value) -> Vec<String> {
                             r.push(String::from("/// ```"));
                             r.push(String::from("///\n/// [`chunks`]: slice::chunks"));
                         }
-                        r.push(format!(r#"pub fn read_{}_{}(&self) -> Result<Vec<{}>, ExitCode> {{
-  let mut size = 1;"#, group_l, element_l, type_r));
+                        r.push(format!(
+                            r#"pub fn read_{}_{}(&self) -> Result<Vec<{}>, ExitCode> {{
+  let mut size = 1;"#,
+                            group_l, element_l, type_r
+                        ));
 
                         for dim in &dimensions {
                             if dim.contains('.') {
-                                  let parts: Vec<&str> = dim.split('.').collect();
-                                  r.push(format!("  size *= self.read_{}_{}()?;", parts[0], parts[1]));
+                                let parts: Vec<&str> = dim.split('.').collect();
+                                r.push(format!(
+                                    "  size *= self.read_{}_{}()?;",
+                                    parts[0], parts[1]
+                                ));
                             } else {
-                                  r.push(format!("  size *= {};", dim));
+                                r.push(format!("  size *= {};", dim));
                             }
                         }
                         r.push(format!(r#"   let mut data: Vec<{type_r}> = Vec::with_capacity(size);
@@ -436,7 +451,6 @@ pub fn write_{group_l}_{element_l}(&self, data: &[{type_r}]) -> Result<(), ExitC
 }}
 "#));
                     }
-                    ,
                     "str" => {
                         r.push(format!(r#"
 /// Reads the `{element}` array from the group `{group}` in the file.
@@ -461,7 +475,10 @@ pub fn write_{group_l}_{element_l}(&self, data: &[{type_r}]) -> Result<(), ExitC
                             if let Some(dim) = dimensions.first() {
                                 if dim.contains('.') {
                                     let parts: Vec<&str> = dim.split('.').collect();
-                                    r.push(format!("/// let {}_{} = trexio_file.read_{}_{}()?;", parts[0], parts[1], parts[0], parts[1]));
+                                    r.push(format!(
+                                        "/// let {}_{} = trexio_file.read_{}_{}()?;",
+                                        parts[0], parts[1], parts[0], parts[1]
+                                    ));
                                     r.push(format!("/// let two_d_array: Vec<_> = one_d_array.chunks({}_{}).collect();", parts[0], parts[1]));
                                 } else {
                                     r.push(format!("/// let two_d_array: Vec<_> = one_d_array.chunks({}).collect();", dim));
@@ -474,10 +491,13 @@ pub fn write_{group_l}_{element_l}(&self, data: &[{type_r}]) -> Result<(), ExitC
   let mut size = 1;"#, group_l, element_l));
                         for dim in &dimensions {
                             if dim.contains('.') {
-                                  let parts: Vec<&str> = dim.split('.').collect();
-                                  r.push(format!("  size *= self.read_{}_{}()?;", parts[0], parts[1]));
+                                let parts: Vec<&str> = dim.split('.').collect();
+                                r.push(format!(
+                                    "  size *= self.read_{}_{}()?;",
+                                    parts[0], parts[1]
+                                ));
                             } else {
-                                  r.push(format!("  size *= {};", dim));
+                                r.push(format!("  size *= {};", dim));
                             }
                         }
                         r.push(format!(r#"   // Allocate an array of *mut i8 pointers (initialized to null)
@@ -544,10 +564,11 @@ pub fn write_{group_l}_{element_l}(&self, data: &[&str]) -> Result<(), ExitCode>
     rc_return((), rc)
 }}
 "#));
-                    },
+                    }
                     "float sparse" => {
                         let size = dimensions.len();
-                        let typ = [ "(", (vec![ "usize" ; size ]).join(", ").as_str(),", f64)"].join("");
+                        let typ =
+                            ["(", (vec!["usize"; size]).join(", ").as_str(), ", f64)"].join("");
                         r.push(format!(r#"
 /// Reads a buffer of {element} from group {group}.
 ///
@@ -591,10 +612,11 @@ pub fn read_{group_l}_{element_l}(&self, offset: usize, buffer_size:usize) -> Re
                         let mut x = Vec::new();
                         for k in 0..size {
                             x.push(format!("i[{k}].try_into().unwrap()"))
-                        };
+                        }
                         x.push("v));\n    }\n    rc_return(result, rc)\n}".to_string());
                         r.push(x.join(", "));
-                        r.push(format!(r#"/// Writes a buffer of {element} from group {group}.
+                        r.push(format!(
+                            r#"/// Writes a buffer of {element} from group {group}.
 ///
 /// # Parameters
 ///
@@ -614,11 +636,12 @@ pub fn write_{group_l}_{element_l}(&self, offset: usize, data: &[{typ}]) -> Resu
     let mut idx = Vec::<i32>::with_capacity({size}*data.len());
     let mut val = Vec::<f64>::with_capacity(data.len());
 
-    for d in data {{ "#));
+    for d in data {{ "#
+                        ));
                         let mut x = Vec::new();
                         for k in 0..size {
                             x.push(format!("       idx.push(d.{k}.try_into().unwrap());"))
-                        };
+                        }
                         r.push(x.join("\n"));
                         r.push(format!(r#"
       val.push(d.{size});
@@ -635,7 +658,7 @@ pub fn write_{group_l}_{element_l}(&self, offset: usize, data: &[{typ}]) -> Resu
            offset, buffer_size, idx_ptr, size_max_idx, val_ptr, size_max_val) }};
     rc_return((), rc)
 }}"#));
-                    },
+                    }
                     "float buffered" => {
                         let typ = "f64";
                         r.push(format!(r#"
@@ -701,7 +724,7 @@ pub fn write_{group_l}_{element_l}(&self, offset: usize, data: &[{typ}]) -> Resu
            offset, buffer_size, val_ptr, size_max) }};
     rc_return((), rc)
 }}"#));
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -710,11 +733,8 @@ pub fn write_{group_l}_{element_l}(&self, offset: usize, data: &[{typ}]) -> Resu
     r
 }
 
-
-
-
 fn extract_json(trexio_h: &PathBuf) -> io::Result<()> {
-     // Read the header file
+    // Read the header file
     let file = File::open(&trexio_h)?;
     let reader = BufReader::new(file);
 
@@ -739,7 +759,7 @@ fn extract_json(trexio_h: &PathBuf) -> io::Result<()> {
         }
     }
 
-   // Write JSON to output file
+    // Write JSON to output file
     let out_dir = env::var("OUT_DIR").unwrap();
     let json_path = PathBuf::from(out_dir).join("trex.json");
 
@@ -755,10 +775,6 @@ fn extract_json(trexio_h: &PathBuf) -> io::Result<()> {
 
     Ok(())
 }
-
-
-
-
 
 /// Reads the JSON file, processes its contents, and generates Rust functions according to the specifications in the JSON data.
 fn make_functions(json_path: &PathBuf) -> std::io::Result<()> {
@@ -792,11 +808,7 @@ impl File {
     Ok(())
 }
 
-
-
-
-
-fn main() -> Result<(), Box<dyn std::error::Error>>  {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let trexio_h = find_header_path()
         .ok_or("Could not find trexio.h - please ensure trexio is installed and findable via pkg-config, TREXIO_INCLUDE_DIR, or in system paths")?;
 
@@ -821,7 +833,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>>  {
         // Add the directory containing trexio.h to the clang include search path.
         // This is essential when using the bundled fallback header (e.g. on docs.rs)
         // where trexio.h is not installed in a system include directory.
-        .clang_arg(format!("-I{}", trexio_h.parent().unwrap().to_str().unwrap()))
+        .clang_arg(format!(
+            "-I{}",
+            trexio_h.parent().unwrap().to_str().unwrap()
+        ))
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
