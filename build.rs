@@ -21,14 +21,17 @@ use pkg_config::Config;
 /// written to trex.json in the output directory
 fn find_header_path() -> Option<PathBuf> {
     // First try pkg-config
-    if let Ok(lib) = Config::new().probe("trexio") {
-        // pkg-config returns include paths, we need to append trexio.h
-        for include_path in lib.include_paths {
-            let header_path = include_path.join("trexio.h");
-            if header_path.exists() {
-                return Some(header_path);
+    match Config::new().probe("trexio") {
+        Ok(lib) => {
+            // pkg-config returns include paths, we need to append trexio.h
+            for include_path in lib.include_paths {
+                let header_path = include_path.join("trexio.h");
+                if header_path.exists() {
+                    return Some(header_path);
+                }
             }
         }
+        Err(_) => println!("cargo:rustc-link-lib=trexio"),
     }
 
     // Try environment variable next
