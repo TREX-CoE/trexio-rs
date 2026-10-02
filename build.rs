@@ -110,16 +110,16 @@ fn make_interface(trexio_h: &PathBuf) -> io::Result<()> {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
     let wrapper_h = out_path.join(WRAPPER_H);
     let mut wrapper_file = File::create(wrapper_h)?;
-    write!(&mut wrapper_file, "#include <trexio.h>\n")?;
+    writeln!(&mut wrapper_file, "#include <trexio.h>")?;
 
     for (k, v) in &err {
-        write!(&mut wrapper_file, "#undef {}\n", k)?;
-        write!(&mut wrapper_file, "const trexio_exit_code {} = {};\n", k, v)?;
+        writeln!(&mut wrapper_file, "#undef {}", k)?;
+        writeln!(&mut wrapper_file, "const trexio_exit_code {} = {};", k, v)?;
     }
 
     for (k, v) in &be {
-        write!(&mut wrapper_file, "#undef {}\n", k)?;
-        write!(&mut wrapper_file, "const back_end_t {} = {};\n", k, v)?;
+        writeln!(&mut wrapper_file, "#undef {}", k)?;
+        writeln!(&mut wrapper_file, "const back_end_t {} = {};", k, v)?;
     }
 
     Ok(())
