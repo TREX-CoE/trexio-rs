@@ -2,7 +2,7 @@
 
 Standalone Rust bindings for the [TREXIO C library](https://github.com/trex-coe/trexio). This crate lives in its own independent repository.
 
-![tests](https://github.com/trex-coe/trexio-rs/workflows/Rust/badge.svg)
+![tests](https://github.com/trex-coe/trexio-rs/workflows/ci.yml/badge.svg)
 ![crates-io](https://img.shields.io/crates/v/trexio)
 
 ## Installation
