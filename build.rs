@@ -498,12 +498,12 @@ pub fn write_{group_l}_{element_l}(&self, data: &[{type_r}]) -> Result<(), ExitC
                                 r.push(format!("  size *= {};", dim));
                             }
                         }
-                        r.push(format!(r#"   // Allocate an array of *mut i8 pointers (initialized to null)
-    let mut dset_out: Vec<*mut i8> = vec![std::ptr::null_mut(); size];
+                        // Use c_char instead of i8 so it adapts: on some platforms (e.g. aarch64)
+        // C's char type maps to u8, while on x86 it maps to i8.
+        r.push(format!(r#"   let mut dset_out: Vec<*mut ::std::os::raw::c_char> = vec![std::ptr::null_mut(); size];
 
-    // Allocate C-style strings and populate dset_out
     for item in dset_out.iter_mut().take(size) {{
-        let c_str: *mut i8 = unsafe {{ std::alloc::alloc_zeroed(std::alloc::Layout::array::<i8>(capacity).unwrap()) as *mut i8 }};
+        let c_str: *mut ::std::os::raw::c_char = unsafe {{ std::alloc::alloc_zeroed(std::alloc::Layout::array::<::std::os::raw::c_char>(capacity).unwrap()) as *mut ::std::os::raw::c_char }};
         if c_str.is_null() {{
             return Err(ExitCode::AllocationFailed);
         }}
@@ -512,23 +512,21 @@ pub fn write_{group_l}_{element_l}(&self, data: &[{type_r}]) -> Result<(), ExitC
 
 
    let rc = unsafe {{
-      c::trexio_read_{group}_{element}(self.ptr, dset_out.as_mut_ptr(), capacity.try_into().expect("try_into failed in read_{group}_{element} (capacity)") )
+      c::trexio_read_{group}_{element}(self.ptr, dset_out.as_mut_ptr(), size.try_into().expect("try into failed"))
    }};
 
-    // Convert the populated C strings to Rust Strings
     let mut rust_strings = Vec::new();
     for &c_str in &dset_out {{
         let rust_str = unsafe {{
-            std::ffi::CStr::from_ptr(c_str)
+            std::ffi::CStr::from_ptr(c_str as *const _)
                 .to_string_lossy()
                 .into_owned()
         }};
         rust_strings.push(rust_str);
     }}
 
-    // Clean up allocated C strings
-    for &c_str in &dset_out {{
-        unsafe {{ std::alloc::dealloc(c_str as *mut u8, std::alloc::Layout::array::<i8>(capacity).unwrap()) }};
+    for c_str in dset_out {{
+        unsafe {{ std::alloc::dealloc(c_str as *mut u8, std::alloc::Layout::array::<::std::os::raw::c_char>(capacity).unwrap()) }};
     }}
 
    rc_return(rust_strings, rc)
