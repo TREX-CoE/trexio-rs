@@ -286,14 +286,18 @@ use std::fs;
 
 #[test]
 pub fn text_backend() {
-    let _ = write("tmp/test_write.dir", trexio::BackEnd::Text);
-    let _ = read("tmp/test_write.dir", trexio::BackEnd::Text);
-    fs::remove_dir_all("tmp/test_write.dir").unwrap()
+    // Pre-cleanup: remove stale artifacts in case a prior run's cleanup was skipped.
+    let _ = fs::remove_dir_all("tmp/test_write.dir");
+
+    write("tmp/test_write.dir", trexio::BackEnd::Text);
+    read("tmp/test_write.dir", trexio::BackEnd::Text);
 }
 
 #[test]
 pub fn hdf5_backend() {
-    let _ = write("tmp/test_write.hdf5", trexio::BackEnd::Hdf5);
-    let _ = read("tmp/test_write.hdf5", trexio::BackEnd::Hdf5);
-    fs::remove_file("tmp/test_write.hdf5").unwrap()
+    // Pre-cleanup: remove stale artifacts in case a prior run's cleanup was skipped.
+    let _ = fs::remove_file("tmp/test_write.hdf5");
+
+    write("tmp/test_write.hdf5", trexio::BackEnd::Hdf5);
+    read("tmp/test_write.hdf5", trexio::BackEnd::Hdf5);
 }
